@@ -1,0 +1,7 @@
+.venv/
+node_modules/
+__pycache__/
+*.py[cod]
+money.db
+money.db-journal
+certs/

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#145b4b"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Money Tracker"><meta name="mobile-web-app-capable" content="yes"><title>Money Tracker</title>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icons/favicon-48.png') }}" type="image/png" sizes="48x48">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <style>@media (max-width: 650px) { .safe-v { font-size: 13px; white-space: nowrap; } }</style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#home" aria-label="Money Tracker home"><img class="brand-mark" src="{{ url_for('static', filename='icons/icon-192.png') }}" alt=""><span>money<span class="brand-light">tracker</span></span></a>
+      <div class="nav-caption">YOUR MONEY</div>
+      <nav id="side-nav" class="side-nav">
+        <button data-view="home" class="nav-item active"><span class="nav-icon icon-svg" style="--icon:url('/static/icons/house.svg')" aria-hidden="true"></span>Home</button>
+        <button data-view="goals" class="nav-item"><span class="nav-icon icon-svg" style="--icon:url('/static/icons/target.svg')" aria-hidden="true"></span>Goals</button>
+        <button data-view="reports" class="nav-item"><span class="nav-icon icon-svg" style="--icon:url('/static/icons/chart-column.svg')" aria-hidden="true"></span>Reports</button>
+        <button data-view="history" class="nav-item"><span class="nav-icon icon-svg" style="--icon:url('/static/icons/history.svg')" aria-hidden="true"></span>History</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="privacy-note"><span class="privacy-dot"></span><span>Private on this device</span></div><button data-view="settings" class="nav-item settings-link"><span class="nav-icon icon-svg" style="--icon:url('/static/icons/settings.svg')" aria-hidden="true"></span>Settings</button></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar"><div><div class="eyebrow" id="today-label"></div><h1 id="page-title">Home</h1></div><div class="top-actions"><button class="icon-button" data-action="import" title="Import bank statement" aria-label="Import bank statement"><span class="icon-svg" style="--icon:url('/static/icons/upload.svg')" aria-hidden="true"></span></button><button class="avatar" data-view="settings" title="Settings">A</button></div></header>
+      <section id="view" class="view-content" aria-live="polite"></section>
+    </main>
+  </div>
+  <nav class="mobile-nav" id="mobile-nav"><button data-view="home" class="active"><span class="icon-svg" style="--icon:url('/static/icons/house.svg')" aria-hidden="true"></span>Home</button><button data-view="goals"><span class="icon-svg" style="--icon:url('/static/icons/target.svg')" aria-hidden="true"></span>Goals</button><button class="mobile-add" data-action="add-menu" aria-label="Add transaction"><span class="icon-svg" style="--icon:url('/static/icons/plus.svg')" aria-hidden="true"></span></button><button data-view="reports"><span class="icon-svg" style="--icon:url('/static/icons/chart-column.svg')" aria-hidden="true"></span>Reports</button><button data-view="history"><span class="icon-svg" style="--icon:url('/static/icons/history.svg')" aria-hidden="true"></span>History</button></nav>
+  <div id="modal-root"></div><div id="toast" class="toast" role="status"></div>
+  <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>if ('serviceWorker' in navigator && window.isSecureContext) window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));</script>
+</body>
+</html>
