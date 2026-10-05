@@ -1,7 +1,8 @@
-const CACHE_NAME = "money-tracker-shell-v6";
+const CACHE_NAME = "money-tracker-shell-v9";
 const SHELL = [
   "/",
   "/static/app.css",
+  "/static/device-store.js",
   "/static/app.js",
   "/static/manifest.webmanifest",
   "/static/vendor/chart.umd.js",

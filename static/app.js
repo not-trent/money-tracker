@@ -1,14 +1,16 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const state = { view: "home", data: null, reportPeriod: "month", reportDate: new Date().toISOString().slice(0, 10), importDraft: null };
+const localDateString = value => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+const today = () => localDateString(new Date());
+const state = { view: "home", data: null, reportPeriod: "month", reportDate: today(), importDraft: null };
 let installPrompt = null;
 const labels = { home: "Home", goals: "Goals", reports: "Reports", history: "History", settings: "Settings" };
 const icons = { bank: "landmark", cash: "wallet", waiting: "arrow-left-right", savings: "piggy-bank", INCOME: "arrow-down-left", EXPENSE: "arrow-up-right", WITHDRAWAL: "arrow-left-right", BANK_CASH: "arrow-left-right", SAVE: "piggy-bank", GOAL: "target", OWED: "receipt-text", OWED_CLEAR: "check" };
 const iconMarkup = (name, extra = "") => `<span class="icon-svg ${extra}" style="--icon:url('/static/icons/${name}.svg')" aria-hidden="true"></span>`;
-const today = () => new Date().toISOString().slice(0, 10);
 const money = cents => `R ${(Number(cents || 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, " ")}`;
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 async function api(path, options = {}) {
+  if (window.moneyStore) return window.moneyStore.api(path, options);
   const response = await fetch(path, { ...options, headers: { ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...options.headers } });
   const data = response.headers.get("content-type")?.includes("application/json") ? await response.json() : response;
   if (!response.ok) throw new Error(data.error || "Something went wrong. Please try again.");
@@ -123,7 +125,7 @@ async function renderReports() {
     $("#view").innerHTML = `<div class="report-top"><div class="period-switch">${["week", "month", "year"].map(p => `<button data-period="${p}" class="${state.reportPeriod === p ? "active" : ""}">${p[0].toUpperCase()}${p.slice(1)}</button>`).join("")}</div><div class="page-actions"><button class="button small ghost" data-date="${back}">‹</button><strong>${periodTitle}</strong><button class="button small ghost" data-date="${forward}" ${state.reportDate >= today() ? "disabled" : ""}>›</button><a class="button small secondary" href="/api/export.csv?period=${state.reportPeriod}&date=${state.reportDate}">Export CSV</a></div></div><div class="report-total-grid">${[["Total in", report.in, "green"], ["Total out", report.out, "red"], ["Saved", report.saved, "blue"], ["Left over", report.left, ""]].map(([label, value, color]) => `<article class="card metric"><div class="metric-label">${label}</div><div class="metric-value ${color}">${money(value)}</div></article>`).join("")}</div>${state.reportPeriod === "year" ? `<article class="card" style="margin-top:16px"><div class="card-title">Month by month · saved ${report.save_rate}% of income</div>${bars(report.months)}<div class="table-wrap"><table class="data-table"><thead><tr><th>Month</th><th class="numeric">In</th><th class="numeric">Out</th><th class="numeric">Saved</th></tr></thead><tbody>${report.months.map(m => `<tr><td>${m.month}</td><td class="numeric green">${money(m.in)}</td><td class="numeric red">${money(m.out)}</td><td class="numeric blue">${money(m.saved)}</td></tr>`).join("")}</tbody></table></div></article>` : ""}<div class="breakdown-grid"><article class="card"><div class="card-title">Money in by person</div>${breakdown(report.people)}</article><article class="card"><div class="card-title">Money in by arrival</div>${breakdown(report.arrivals, { bank: "Bank deposit", cash: "Cash in hand", cashsend: "Cash send" })}</article><article class="card"><div class="card-title">Money out by category</div>${breakdown(report.categories)}</article></div>`;
   } catch (error) { showError(error); }
 }
-function offsetDate(offset, period) { const d = new Date(`${state.reportDate}T12:00:00`); if (period === "week") d.setDate(d.getDate() + offset * 7); else if (period === "year") d.setFullYear(d.getFullYear() + offset); else d.setMonth(d.getMonth() + offset); return d.toISOString().slice(0, 10); }
+function offsetDate(offset, period) { const d = new Date(`${state.reportDate}T12:00:00`); if (period === "week") d.setDate(d.getDate() + offset * 7); else if (period === "year") d.setFullYear(d.getFullYear() + offset); else d.setMonth(d.getMonth() + offset); return localDateString(d); }
 function breakdown(obj = {}, names = {}) { const rows = Object.entries(obj); return rows.length ? rows.sort((a, b) => b[1] - a[1]).map(([name, cents]) => `<div class="breakdown-line"><span>${escapeHtml(names[name] || name)}</span><strong>${money(cents)}</strong></div>`).join("") : `<div class="empty">Nothing recorded for this period.</div>`; }
 function bars(months) {
   setTimeout(() => {
@@ -174,6 +176,21 @@ function addSettingsEditors(settings) {
     rename.dataset.name = remove.dataset.name;
     remove.before(rename);
   });
+  const dataSection = $$("#view .setting-section").find(item => item.textContent.includes("Your data"));
+  if (dataSection && !$("#device-backup-file")) {
+    const restoreButton = document.createElement("button");
+    restoreButton.type = "button";
+    restoreButton.className = "button ghost";
+    restoreButton.dataset.action = "restore-backup";
+    restoreButton.textContent = "↑ Restore a device backup";
+    dataSection.querySelector(".actions")?.append(restoreButton);
+    const input = document.createElement("input");
+    input.id = "device-backup-file";
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.hidden = true;
+    dataSection.append(input);
+  }
 }
 async function renderSettings() {
   try {
@@ -234,6 +251,12 @@ function showImportReview() {
 }
 async function delegatedClick(event) {
   const target = event.target.closest("button,a"); if (!target) return;
+  if (target.tagName === "A" && target.getAttribute("href")?.startsWith("/api/")) {
+    event.preventDefault();
+    try { await window.moneyStore.download(target.pathname + target.search); }
+    catch (error) { toast(error.message); }
+    return;
+  }
   if (target.dataset.action === "retry") { refresh().catch(showOffline); return; }
   if (!state.data && !target.closest("#modal-root")) { toast("Can't reach your computer yet. Check Wi-Fi and that Money Tracker is running."); return; }
   if (target.dataset.view) { navigate(target.dataset.view); return; }
@@ -251,6 +274,7 @@ async function delegatedClick(event) {
     installPrompt = null;
     await renderSettings();
   }
+  else if (action === "restore-backup") $("#device-backup-file")?.click();
   else if (action === "save-openings") {
     const values = Object.fromEntries(new FormData($("#opening-form")));
     try { await post("/api/settings", { savings_pct: $("#savings-pct").value, dark_mode: state.data.dark_mode, opening: values }); toast("Starting balances saved."); await refresh(); navigate("settings"); }
@@ -275,6 +299,12 @@ async function delegatedClick(event) {
 document.addEventListener("click", event => { delegatedClick(event).catch(showError); });
 document.addEventListener("change", event => {
   if (event.target.matches("[data-filter]")) renderHistory();
+  if (event.target.id === "device-backup-file" && event.target.files?.[0]) {
+    const file = event.target.files[0];
+    if (confirm("Restore this backup on this device? It replaces this device's current records.")) {
+      window.moneyStore.restore(file).then(async () => { toast("Backup restored on this device."); await refresh(); navigate("settings"); }).catch(showError);
+    }
+  }
 });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { if (state.data?.dark_mode === "system") applyTheme("system"); });
 window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; if (state.view === "settings") renderSettings(); });

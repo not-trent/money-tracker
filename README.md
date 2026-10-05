@@ -1,14 +1,22 @@
 # Money Tracker
 
-A private, single-user finance tracker built with Flask, SQLite, HTML, CSS and JavaScript. All data is stored locally in `money.db`; the app binds only to `127.0.0.1:5001`.
+A no-login personal finance PWA. Each browser installation keeps a separate ledger in its own IndexedDB; there is no account, data sync, or financial-data upload to the host. Flask serves the local development version at port 5001. The old `money.db` is retained only for migrating the original computer ledger.
 
 ## Start
 
-Install Python 3.10 or newer (or `uv`). On Windows, double-click `start.bat`. On Linux or macOS, run `bash ./start.sh`. The start script creates a local virtual environment, installs Flask, and starts the app at http://localhost:5001. If Python is managed by `uv`, the scripts use `uv run` instead. The initial screen asks for starting balances.
+Install Python 3.10 or newer (or `uv`). On Windows, double-click `start.bat`. On Linux or macOS, run `bash ./start.sh`. The initial screen asks for starting balances for this browser installation.
 
-For phone access on your private Wi-Fi, double-click `start-mobile.bat` instead. Open the computer's local Wi-Fi address on the phone at port `5001`, then use Chrome's **Add to Home screen** menu. The phone and computer must stay on the same trusted Wi-Fi, and the computer must remain on with the app running. This mobile mode has no login and is reachable by other devices on that Wi-Fi; do not use it on public/guest networks or set up router port forwarding. Regular `start.bat` remains computer-only.
+For temporary phone access on your private Wi-Fi, double-click `start-mobile.bat`. The computer must remain on and the phone must trust the local certificate. The server's old SQLite API is blocked to non-local clients; the PWA itself stores new data only in the browser.
 
-The app also includes a PWA manifest, app icons, and a service worker that caches the interface assets only; financial API responses are never cached. Android Chrome requires a trusted HTTPS connection before it offers **Install app**. The plain local HTTP address is usable in Chrome but is not installable. For a local trusted certificate on Windows:
+The PWA includes a manifest, PNG app icons, and a service worker that caches interface assets only. Android Chrome needs HTTPS to install it. The local `start-mobile.bat` certificate setup below is only for testing on your home Wi-Fi; for a shareable link, use a static HTTPS host such as Cloudflare Pages. Build the static site with:
+
+```powershell
+uv run --with-requirements requirements.txt --python 3.14 python build_static.py
+```
+
+Deploy the `dist/` folder to a static HTTPS host. For Cloudflare Pages, connect this GitHub repository and set the build command to `pip install -r requirements.txt && python build_static.py` and the output directory to `dist`. Anyone with the link can install the PWA, but each device/browser has its own separate ledger. Records do not sync between devices.
+
+For temporary local phone testing with `start-mobile.bat`, create a trusted certificate:
 
 1. Install mkcert with `winget install --id FiloSottile.mkcert -e`.
 2. In PowerShell, from the `money-tracker` folder, run `mkcert -install` and `New-Item -ItemType Directory -Force certs`.
@@ -26,7 +34,9 @@ To run tests after setup:
 
 ## Your data
 
-The database lives beside `app.py` as `money.db`. Use **Settings → Back up my data** to download a copy. Keep the database and its backup private; it contains your financial history.
+Use **Settings → Back up my data** to save a JSON backup on that device. **Restore a device backup** imports it and replaces the current device's data. Transfer the backup file yourself, such as by USB; it contains financial details.
+
+The original computer ledger remains in `money.db`. To migrate it into this browser's local PWA storage, run `uv run --with-requirements requirements.txt --python 3.14 python export_device_backup.py`, then open Settings in the PWA and restore `money-tracker-device-backup.json`. The export file is git-ignored and should be transferred privately if restoring on a different device. The former `/api/` SQLite routes are blocked to other devices.
 
 ## Current scope
 

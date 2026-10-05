@@ -70,6 +70,10 @@ class MoneyMathTests(unittest.TestCase):
             self.assertEqual(worker.status_code, 200)
             self.assertEqual(worker.headers["Service-Worker-Allowed"], "/")
 
+    def test_legacy_sqlite_api_is_not_reachable_from_other_devices(self):
+        response = money.app.test_client().get("/api/initialize", environ_base={"REMOTE_ADDR": "192.168.0.221"})
+        self.assertEqual(response.status_code, 403)
+
     def test_sample_csv_layouts_import_duplicates_and_undo(self):
         samples = Path(__file__).parent / "samples"
         expectations = {"amount.csv": 85000, "debit-credit.csv": 85000, "comma-decimal.csv": 120900}

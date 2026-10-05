@@ -18,6 +18,12 @@ DEFAULT_CATEGORIES = ["Food", "Transport", "Rent", "Airtime and data", "Electric
 OPENING_KEYS = {"bank": "opening_bank", "cash": "opening_cash", "waiting": "opening_waiting", "savings": "opening_savings"}
 
 
+@app.before_request
+def protect_legacy_api():
+    if request.path.startswith("/api/") and request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify(error="The legacy computer database is available only on this computer."), 403
+
+
 @contextmanager
 def connect():
     db = sqlite3.connect(DB_PATH)

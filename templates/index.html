@@ -30,6 +30,7 @@
   <nav class="mobile-nav" id="mobile-nav"><button data-view="home" class="active"><span class="icon-svg" style="--icon:url('/static/icons/house.svg')" aria-hidden="true"></span>Home</button><button data-view="goals"><span class="icon-svg" style="--icon:url('/static/icons/target.svg')" aria-hidden="true"></span>Goals</button><button class="mobile-add" data-action="add-menu" aria-label="Add transaction"><span class="icon-svg" style="--icon:url('/static/icons/plus.svg')" aria-hidden="true"></span></button><button data-view="reports"><span class="icon-svg" style="--icon:url('/static/icons/chart-column.svg')" aria-hidden="true"></span>Reports</button><button data-view="history"><span class="icon-svg" style="--icon:url('/static/icons/history.svg')" aria-hidden="true"></span>History</button></nav>
   <div id="modal-root"></div><div id="toast" class="toast" role="status"></div>
   <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+  <script src="{{ url_for('static', filename='device-store.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>if ('serviceWorker' in navigator && window.isSecureContext) window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));</script>
 </body>

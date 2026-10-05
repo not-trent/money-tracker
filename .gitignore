@@ -1,7 +1,9 @@
 .venv/
 node_modules/
+dist/
 __pycache__/
 *.py[cod]
 money.db
 money.db-journal
 certs/
+money-tracker-device-backup.json
