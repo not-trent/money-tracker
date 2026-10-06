@@ -1,4 +1,4 @@
-const CACHE_NAME = "money-tracker-shell-v11";
+const CACHE_NAME = "money-tracker-shell-v12";
 const SHELL = [
   "/",
   "/static/app.css",
