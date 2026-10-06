@@ -19,7 +19,7 @@
 
   function freshState() {
     return {
-      settings: { setup_done: false, savings_pct: 20, dark_mode: "system", opening: { bank: 0, cash: 0, waiting: 0, savings: 0 }, opening_owed: 0, csv_mapping: {} },
+      settings: { setup_done: false, savings_pct: 20, dark_mode: "system", color_palette: "forest", opening: { bank: 0, cash: 0, waiting: 0, savings: 0 }, opening_owed: 0, csv_mapping: {} },
       people: [], categories: [...CATEGORIES], goals: [], entries: [], rules: [], nextId: 1, nextGoalId: 1
     };
   }
@@ -29,7 +29,11 @@
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readonly");
       const request = tx.objectStore(STORE_NAME).get(STATE_KEY);
-      request.onsuccess = () => resolve(request.result?.value || freshState());
+      request.onsuccess = () => {
+        const state = request.result?.value || freshState();
+        state.settings.color_palette ||= "forest";
+        resolve(state);
+      };
       request.onerror = () => reject(request.error);
     });
   }
@@ -211,7 +215,7 @@
       const state = await readState();
       const b = balance(state);
       const waiting = state.entries.filter(entry => entry.entry_type === "INCOME" && entry.arrival === "cashsend" && !state.entries.some(item => item.entry_type === "WITHDRAWAL" && item.linked_id === entry.id)).map(entry => ({ ...entry, remaining: Math.max(0, entry.amount - state.entries.filter(item => item.entry_type === "SAVE" && item.linked_id === entry.id).reduce((sum, item) => sum + item.amount, 0)) }));
-      return { setup_done: state.settings.setup_done, balances: b, savings_pct: state.settings.savings_pct, dark_mode: state.settings.dark_mode, people: state.people, categories: state.categories, entries: [...state.entries].sort((a, b) => b.entry_date.localeCompare(a.entry_date) || b.id - a.id).slice(0, 8), goals: state.goals, waiting };
+      return { setup_done: state.settings.setup_done, balances: b, savings_pct: state.settings.savings_pct, dark_mode: state.settings.dark_mode, color_palette: state.settings.color_palette || "forest", people: state.people, categories: state.categories, entries: [...state.entries].sort((a, b) => b.entry_date.localeCompare(a.entry_date) || b.id - a.id).slice(0, 8), goals: state.goals, waiting };
     }
     if (url.pathname === "/api/home-summary") {
       const state = await readState(); const b = balance(state); const now = new Date(); const today = dateString(now);
@@ -256,11 +260,12 @@
       addEntry(state, "EXPENSE", amount, date, { category: String(payload.category || "Other"), pocket, note: String(payload.note || "") });
       return { ok: true };
     });
-    if (url.pathname === "/api/settings" && method === "GET") { const state = await readState(); return { savings_pct: state.settings.savings_pct, dark_mode: state.settings.dark_mode, opening: state.settings.opening, owed: state.settings.opening_owed }; }
+    if (url.pathname === "/api/settings" && method === "GET") { const state = await readState(); return { savings_pct: state.settings.savings_pct, dark_mode: state.settings.dark_mode, color_palette: state.settings.color_palette, opening: state.settings.opening, owed: state.settings.opening_owed }; }
     if (url.pathname === "/api/settings" && method === "POST") return mutate(state => {
       const pct = Number(payload.savings_pct ?? state.settings.savings_pct);
       if (!Number.isInteger(pct) || pct < 0 || pct > 100) throw new Error("Savings percentage must be a whole number from 0 to 100.");
       state.settings.savings_pct = pct; state.settings.dark_mode = ["system", "light", "dark"].includes(payload.dark_mode) ? payload.dark_mode : state.settings.dark_mode;
+      state.settings.color_palette = ["forest", "ocean", "berry", "sunset"].includes(payload.color_palette) ? payload.color_palette : state.settings.color_palette || "forest";
       if (payload.opening) for (const key of ["bank", "cash", "waiting", "savings"]) state.settings.opening[key] = cents(payload.opening[key] || 0);
       return { ok: true };
     });

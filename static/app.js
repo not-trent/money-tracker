@@ -18,9 +18,10 @@ async function api(path, options = {}) {
 }
 const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body) });
 function toast(text) { const node = $("#toast"); node.textContent = text; node.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), 2800); }
-function applyTheme(mode) {
+function applyTheme(mode, palette = "forest") {
   const dark = mode === "dark" || (mode === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.classList.toggle("dark", dark);
+  document.documentElement.dataset.palette = ["forest", "ocean", "berry", "sunset"].includes(palette) ? palette : "forest";
 }
 function modal(title, copy, content, onReady) {
   const root = $("#modal-root");
@@ -31,7 +32,7 @@ function modal(title, copy, content, onReady) {
 function closeModal() { $("#modal-root").innerHTML = ""; }
 function field(label, name, type = "text", value = "", attrs = "") { return `<div class="field"><label for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${escapeHtml(value)}" ${attrs}></div>`; }
 function selectField(label, name, values, chosen = "") { return `<div class="field"><label for="${name}">${label}</label><select id="${name}" name="${name}">${values.map(([value, text]) => `<option value="${escapeHtml(value)}" ${value === chosen ? "selected" : ""}>${escapeHtml(text)}</option>`).join("")}</select></div>`; }
-function refresh() { return api("/api/initialize").then(data => { state.data = data; applyTheme(data.dark_mode); if (data.setup_done) render(); else renderSetup(); }); }
+function refresh() { return api("/api/initialize").then(data => { state.data = data; applyTheme(data.dark_mode, data.color_palette); if (data.setup_done) render(); else renderSetup(); }); }
 function navigate(view) {
   state.view = view;
   $$("[data-view]").forEach(button => button.classList.toggle("active", button.dataset.view === view));
@@ -192,11 +193,18 @@ function addSettingsEditors(settings) {
     dataSection.append(input);
   }
 }
+function addPaletteEditor(settings) {
+  const appearance = $$("#view .setting-section").find(item => item.querySelector(".segmented"));
+  if (!appearance) return;
+  const options = [["forest", "Forest", "#145b4b"], ["ocean", "Ocean", "#176b87"], ["berry", "Berry", "#7950a1"], ["sunset", "Sunset", "#b55336"]];
+  appearance.insertAdjacentHTML("beforeend", `<h3 class="palette-heading">Color palette</h3><div class="palette-options" role="group" aria-label="Color palette">${options.map(([id, label, color]) => `<button type="button" class="palette-option ${settings.color_palette === id ? "active" : ""}" data-palette="${id}" aria-pressed="${settings.color_palette === id}" aria-label="${label} palette"><span class="palette-swatch" style="--swatch:${color}"></span><span>${label}</span></button>`).join("")}</div>`);
+}
 async function renderSettings() {
   try {
     const settings = await api("/api/settings");
     $("#view").innerHTML = `<div class="panel-grid"><article class="card"><div class="card-title">Preferences</div><div class="setting-section"><h3>Savings reminder</h3><div class="inline-form"><label for="savings-pct">Set aside</label><input id="savings-pct" type="number" min="0" max="100" step="1" value="${settings.savings_pct}" style="width:90px"><span>% of money in</span><button class="button small" data-action="save-settings">Save</button></div></div><div class="setting-section"><h3>Appearance</h3><div class="segmented">${[["system", "Device"], ["light", "Light"], ["dark", "Dark"]].map(([v, t]) => `<button data-theme="${v}" class="${settings.dark_mode === v ? "active" : ""}">${t}</button>`).join("")}</div></div><div class="setting-section"><h3>Starting balances</h3><p class="row-meta">${Object.keys(settings.opening).map(key => `${key}: ${money(settings.opening[key])}`).join(" · ")}</p><p class="row-meta">Starting balances are locked once you add entries.</p></div><div class="setting-section"><h3>Your data</h3><div class="actions"><a class="button secondary" href="/api/backup">↓ Back up my data</a><button class="button ghost" data-action="import">⇧ Import bank statement</button></div><p class="row-meta">Your data stays in this folder on this device.</p></div></article><article class="card"><div class="card-title">People</div><div class="setting-section"><div class="inline-form"><input id="new-person" placeholder="Add a person"><button class="button small" data-add-list="people">Add</button></div><div class="tag-list">${state.data.people.map(name => `<span class="tag">${escapeHtml(name)}<button data-remove-list="people" data-name="${escapeHtml(name)}" aria-label="Remove ${escapeHtml(name)}">×</button></span>`).join("")}</div></div><div class="setting-section"><h3>Categories</h3><div class="inline-form"><input id="new-category" placeholder="Add a category"><button class="button small" data-add-list="categories">Add</button></div><div class="tag-list">${state.data.categories.map(name => `<span class="tag">${escapeHtml(name)}<button data-remove-list="categories" data-name="${escapeHtml(name)}" aria-label="Remove ${escapeHtml(name)}">×</button></span>`).join("")}</div></div></article></div>`;
     addSettingsEditors(settings);
+    addPaletteEditor(settings);
     if (installPrompt) {
       const installButton = document.createElement("button");
       installButton.className = "button secondary pwa-install";
@@ -277,7 +285,7 @@ async function delegatedClick(event) {
   else if (action === "restore-backup") $("#device-backup-file")?.click();
   else if (action === "save-openings") {
     const values = Object.fromEntries(new FormData($("#opening-form")));
-    try { await post("/api/settings", { savings_pct: $("#savings-pct").value, dark_mode: state.data.dark_mode, opening: values }); toast("Starting balances saved."); await refresh(); navigate("settings"); }
+    try { await post("/api/settings", { savings_pct: $("#savings-pct").value, dark_mode: state.data.dark_mode, opening: values }); toast("Starting balances saved."); await refresh(); }
     catch (error) { toast(error.message); }
   }
   else if (action === "clear-owed") openClearOwed();
@@ -285,12 +293,13 @@ async function delegatedClick(event) {
   else if (target.dataset.goalAdd) openGoalAdd(Number(target.dataset.goalAdd));
   else if (target.dataset.period) { state.reportPeriod = target.dataset.period; await renderReports(); }
   else if (target.dataset.date) { state.reportDate = target.dataset.date; await renderReports(); }
-  else if (target.dataset.theme) { try { await post("/api/settings", { savings_pct: $("#savings-pct")?.value || state.data.savings_pct, dark_mode: target.dataset.theme }); await refresh(); navigate("settings"); } catch (error) { toast(error.message); } }
-  else if (target.dataset.addList) { const kind = target.dataset.addList, input = $(`#new-${kind === "people" ? "person" : "category"}`); try { await post("/api/list", { kind, action: "add", name: input.value }); await refresh(); navigate("settings"); } catch (error) { toast(error.message); } }
-  else if (target.dataset.removeList) { try { await post("/api/list", { kind: target.dataset.removeList, action: "remove", name: target.dataset.name }); await refresh(); navigate("settings"); } catch (error) { toast(error.message); } }
+  else if (target.dataset.theme) { try { await post("/api/settings", { savings_pct: $("#savings-pct")?.value || state.data.savings_pct, dark_mode: target.dataset.theme, color_palette: state.data.color_palette }); await refresh(); } catch (error) { toast(error.message); } }
+  else if (target.dataset.palette) { try { await post("/api/settings", { savings_pct: $("#savings-pct")?.value || state.data.savings_pct, dark_mode: state.data.dark_mode, color_palette: target.dataset.palette }); await refresh(); } catch (error) { toast(error.message); } }
+  else if (target.dataset.addList) { const kind = target.dataset.addList, input = $(`#new-${kind === "people" ? "person" : "category"}`); try { await post("/api/list", { kind, action: "add", name: input.value }); await refresh(); } catch (error) { toast(error.message); } }
+  else if (target.dataset.removeList) { try { await post("/api/list", { kind: target.dataset.removeList, action: "remove", name: target.dataset.name }); await refresh(); } catch (error) { toast(error.message); } }
   else if (target.dataset.renameList) {
     const name = prompt("Rename this item:", target.dataset.name);
-    if (name?.trim()) { try { await post("/api/list", { kind: target.dataset.renameList, action: "rename", name: target.dataset.name, new_name: name.trim() }); await refresh(); navigate("settings"); } catch (error) { toast(error.message); } }
+    if (name?.trim()) { try { await post("/api/list", { kind: target.dataset.renameList, action: "rename", name: target.dataset.name, new_name: name.trim() }); await refresh(); } catch (error) { toast(error.message); } }
   }
   else if (target.dataset.editEntry) openEditEntry(Number(target.dataset.editEntry));
   else if (target.dataset.deleteEntry) { if (confirm("Are you sure you want to delete this entry?")) { try { await api(`/api/entries/${target.dataset.deleteEntry}`, { method: "DELETE" }); toast("Entry deleted."); await refresh(); await renderHistory(); } catch (error) { toast(error.message); } } }
